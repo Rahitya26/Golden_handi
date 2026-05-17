@@ -101,6 +101,35 @@ router.post('/sales', async (req, res) => {
   }
 });
 
+// POST Bulk Add Sales
+router.post('/sales/bulk', async (req, res) => {
+  const db = req.app.get('db');
+  const items = req.body; // expected array of { category, sub_category, amount, sale_date }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Invalid data format' });
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    for (const item of items) {
+      await client.query(
+        'INSERT INTO sales (amount, category, sub_category, sale_date) VALUES ($1, $2, $3, $4)',
+        [item.amount, item.category, item.sub_category, item.sale_date]
+      );
+    }
+    await client.query('COMMIT');
+    res.status(201).json({ message: 'Bulk import successful', count: items.length });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Bulk insert error:', error);
+    res.status(500).json({ error: 'Bulk import failed' });
+  } finally {
+    client.release();
+  }
+});
+
 // GET Expenses
 router.get('/expenses', async (req, res) => {
   const db = req.app.get('db');

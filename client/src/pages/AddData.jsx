@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5001/api';
 
 export default function AddData() {
   const [formData, setFormData] = useState({

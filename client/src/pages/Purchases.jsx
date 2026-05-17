@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { Plus, Upload, Search, CheckCircle, XCircle } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5001/api';
 
 const defaultCategories = [
   "Bakery Items", "Basmati Rice", "Biscuits", "Char Coal", "Coffee paymt", "Chips", "Chicken Nuggets", "Chicken", "Pudding Creams & Sauces", "Dairy Products", "Disposables", "Eggs", "English Vegitables", "Fish & Prawns", "Fried Onions", "Fruits", "Gas", "Ghee", "Grocessories", "Sunpure Oil", "House Keeping Material", "Ice Cream", "Ice Cubes", "Milk & Curd", "Mutton", "Natukodi", "Noodles", "Onion", "Paneer & Butter", "Pest Control Material", "Soft Drinks & Mineral Water", "Safron", "Sounf", "Printing & stationary", "Tea powder", "Vegetables", "Water Bubbles", "Water Tanker", "Uniform", "Cutlery", "AMB Mall", "Kondapur stores", "FNF Ventures", "DLF", "MKPT", "Kothaguda"

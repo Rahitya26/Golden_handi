@@ -4,9 +4,9 @@ import { format } from 'date-fns';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { Download, CheckCircle, XCircle } from 'lucide-react';
+import { Download, CheckCircle, XCircle, Upload } from 'lucide-react';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5001/api';
 
 export default function Dashboard({ dateRange }) {
   const [summary, setSummary] = useState({
@@ -22,6 +22,12 @@ export default function Dashboard({ dateRange }) {
   const [breakdown, setBreakdown] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [toast, setToast] = useState(null);
+  
+  // Bulk Import State
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkDate, setBulkDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [bulkFile, setBulkFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
   
   // Inline Form State
   const [addAmount, setAddAmount] = useState('');
@@ -260,6 +266,74 @@ export default function Dashboard({ dateRange }) {
     }
   };
 
+  const handleBulkImport = async () => {
+    if (!bulkFile) return showToast('Please select an Excel file first.', 'error');
+    setIsImporting(true);
+    try {
+      const buffer = await bulkFile.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.worksheets[0];
+      
+      const items = [];
+      const mappings = [];
+      
+      // Step 1: Scan row 1 for headers
+      const headerRow = worksheet.getRow(1);
+      headerRow.eachCell((cell, colNumber) => {
+        const text = cell.text.trim().toLowerCase();
+        if (text === 'tea') mappings.push({ index: colNumber, category: 'Tea Counter' });
+        if (text === 'restaurant') mappings.push({ index: colNumber, category: 'Restaurant' });
+        if (text === 'online') mappings.push({ index: colNumber, category: 'Online' });
+      });
+
+      if (mappings.length === 0) {
+        setIsImporting(false);
+        return showToast('No valid headers (Tea, Restaurant, Online) found in Row 1.', 'error');
+      }
+
+      // Step 2: Parse data rows dynamically based on the mappings
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          mappings.forEach(mapping => {
+            const subCat = row.getCell(mapping.index).text;
+            const amountStr = row.getCell(mapping.index + 1).text; // Amount should be the immediate next column
+            
+            if (subCat && amountStr) {
+              const rawAmount = Number(amountStr.replace(/,/g, '').replace(/[^0-9.-]+/g,""));
+              if (!isNaN(rawAmount) && amountStr.match(/[0-9]/)) {
+                items.push({
+                  category: mapping.category,
+                  sub_category: subCat.trim(),
+                  amount: rawAmount,
+                  sale_date: bulkDate
+                });
+              }
+            }
+          });
+        }
+      });
+
+      if (items.length === 0) {
+        setIsImporting(false);
+        return showToast('No valid data found under the headers.', 'error');
+      }
+
+      await axios.post(`${API_URL}/sales/bulk`, items);
+      setShowBulkModal(false);
+      setBulkFile(null);
+      fetchSummary();
+      fetchChartData();
+      fetchProfitChartData();
+      showToast(`Successfully imported ${items.length} sales!`);
+    } catch (error) {
+      console.error(error);
+      showToast('Bulk import failed. Please check your Excel format.', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const totalSales = Number(summary['Tea Counter'] || 0) + Number(summary['Restaurant'] || 0) + Number(summary['Online'] || 0);
   const totalExpenses = Number(summary['Expenses'] || 0);
   const totalPurchases = Number(summary['Purchases'] || 0);
@@ -303,14 +377,23 @@ export default function Dashboard({ dateRange }) {
           <h2 className="text-3xl font-bold text-white mb-1 uppercase tracking-wide">Dashboard</h2>
           <p className="text-brand-accent text-sm tracking-widest uppercase">Financial Overview</p>
         </div>
-        <button
-          onClick={handleDownloadReport}
-          disabled={isDownloading}
-          className="bg-brand-success hover:bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 uppercase tracking-wide shadow-lg shadow-brand-success/20 disabled:opacity-70"
-        >
-          <Download className="w-4 h-4" />
-          {isDownloading ? 'Generating...' : 'Download Report'}
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={() => setShowBulkModal(true)}
+            className="bg-dark-card hover:bg-dark-bg border border-dark-border text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 uppercase tracking-wide shadow-lg shadow-black/20"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Import
+          </button>
+          <button
+            onClick={handleDownloadReport}
+            disabled={isDownloading}
+            className="bg-brand-success hover:bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 uppercase tracking-wide shadow-lg shadow-brand-success/20 disabled:opacity-70"
+          >
+            <Download className="w-4 h-4" />
+            {isDownloading ? 'Generating...' : 'Download Report'}
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -590,6 +673,75 @@ export default function Dashboard({ dateRange }) {
           }`}>
             {toast.type === 'error' ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
             <span className="text-sm font-bold uppercase tracking-wider">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-dark-card rounded-2xl border border-dark-border w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-white uppercase tracking-wider">Bulk Import Sales</h3>
+                  <p className="text-xs text-dark-muted uppercase tracking-wider mt-1">Upload via Excel (.xlsx)</p>
+                </div>
+                <button onClick={() => {setShowBulkModal(false); setBulkFile(null);}} className="text-dark-muted hover:text-white p-1 bg-dark-bg rounded-md">&times;</button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-brand-primary/10 border border-brand-primary/30 p-4 rounded-lg">
+                  <p className="text-sm text-brand-primary leading-relaxed">
+                    The system will dynamically scan Row 1 for <span className="font-bold text-white">Tea</span>, <span className="font-bold text-white">Restaurant</span>, or <span className="font-bold text-white">Online</span> headers, and extract the sub-category and amount (from the very next column) automatically.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-dark-muted uppercase tracking-widest">Assign Date to All Imports</label>
+                  <input
+                    type="date"
+                    value={bulkDate}
+                    onChange={(e) => setBulkDate(e.target.value)}
+                    required
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary uppercase"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-dark-muted uppercase tracking-widest">Select Excel File</label>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={(e) => setBulkFile(e.target.files[0])}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2.5 text-sm text-dark-muted file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-wider file:bg-brand-primary file:text-white hover:file:bg-blue-600 focus:outline-none focus:border-brand-primary cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-2">
+                  <button
+                    onClick={() => {setShowBulkModal(false); setBulkFile(null);}}
+                    className="flex-1 bg-dark-bg text-dark-muted hover:text-white font-medium py-3 rounded-lg border border-dark-border transition-colors text-xs uppercase tracking-wider"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkImport}
+                    disabled={isImporting || !bulkFile}
+                    className="flex-1 bg-brand-primary hover:bg-blue-600 text-white font-medium py-3 rounded-lg transition-colors text-xs uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                  >
+                    {isImporting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Importing...</span>
+                      </>
+                    ) : (
+                      'Start Import'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

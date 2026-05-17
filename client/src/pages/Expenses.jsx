@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { Plus, Upload, Search, CheckCircle, XCircle } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5001/api';
 
 const defaultCategories = [
   "Advertisement", "Registration & licencefee", "Auditor fee", "Bank Charges", 
