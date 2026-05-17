@@ -103,7 +103,7 @@ export default function Dashboard({ dateRange }) {
         startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
         endDate: format(dateRange.endDate, 'yyyy-MM-dd')
       };
-      const res = await axios.get(`${API_URL}/dashboard/breakdown/${category}`, { params });
+      const res = await axios.get(`${API_URL}/dashboard/breakdown/${encodeURIComponent(category)}`, { params });
       setBreakdown(res.data);
       setSelectedCategory(category);
       setAddAmount('');
