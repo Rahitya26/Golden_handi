@@ -2,10 +2,15 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, PlusCircle, Receipt, ShoppingCart } from 'lucide-react';
 import { cn } from '../utils/cn';
 
-export default function Sidebar() {
+export default function Sidebar({ selectedBranch = 'Golden Handi (G.H)' }) {
+  const cleanBranchName = selectedBranch.replace(/\s*\(.*?\)\s*/g, '').trim();
+  const nameParts = cleanBranchName.split(' ');
+  const firstWord = nameParts[0];
+  const restOfName = nameParts.slice(1).join(' ');
+
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/add-data', icon: PlusCircle, label: 'Add Data' },
+    { to: '/add-data', icon: PlusCircle, label: 'Sales' },
     { to: '/expenses', icon: Receipt, label: 'Expenses' },
     { to: '/purchases', icon: ShoppingCart, label: 'Purchases' },
   ];
@@ -13,8 +18,8 @@ export default function Sidebar() {
   return (
     <aside className="w-64 bg-dark-bg border-r border-dark-border flex flex-col">
       <div className="h-16 flex items-center px-6 border-b border-dark-border">
-        <h1 className="text-xl font-bold text-white tracking-wide">
-          Golden <span className="text-brand-primary">Handi</span>
+        <h1 className="text-xl font-bold text-white tracking-wide truncate">
+          {firstWord} {restOfName && <span className="text-brand-primary">{restOfName}</span>}
         </h1>
       </div>
       <nav className="flex-1 py-6 px-3 space-y-1">

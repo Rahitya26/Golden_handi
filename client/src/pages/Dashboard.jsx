@@ -8,7 +8,7 @@ import { Download, CheckCircle, XCircle, Upload } from 'lucide-react';
 
 const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5001/api';
 
-export default function Dashboard({ dateRange }) {
+export default function Dashboard({ dateRange, selectedBranch }) {
   const [summary, setSummary] = useState({
     'Tea Counter': 0,
     'Restaurant': 0,
@@ -43,13 +43,14 @@ export default function Dashboard({ dateRange }) {
     fetchSummary();
     fetchChartData();
     fetchProfitChartData();
-  }, [dateRange]);
+  }, [dateRange, selectedBranch]);
 
   const fetchSummary = async () => {
     try {
       const params = {
         startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
-        endDate: format(dateRange.endDate, 'yyyy-MM-dd')
+        endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
+        branch: selectedBranch
       };
       const res = await axios.get(`${API_URL}/dashboard/summary`, { params });
       setSummary(res.data);
@@ -62,7 +63,8 @@ export default function Dashboard({ dateRange }) {
     try {
       const params = {
         startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
-        endDate: format(dateRange.endDate, 'yyyy-MM-dd')
+        endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
+        branch: selectedBranch
       };
       const res = await axios.get(`${API_URL}/dashboard/chart`, { params });
       
@@ -82,7 +84,8 @@ export default function Dashboard({ dateRange }) {
     try {
       const params = {
         startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
-        endDate: format(dateRange.endDate, 'yyyy-MM-dd')
+        endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
+        branch: selectedBranch
       };
       const res = await axios.get(`${API_URL}/dashboard/profit-chart`, { params });
       const formattedData = res.data.map(item => ({
@@ -101,7 +104,8 @@ export default function Dashboard({ dateRange }) {
     try {
       const params = {
         startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
-        endDate: format(dateRange.endDate, 'yyyy-MM-dd')
+        endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
+        branch: selectedBranch
       };
       const res = await axios.get(`${API_URL}/dashboard/breakdown/${encodeURIComponent(category)}`, { params });
       setBreakdown(res.data);
@@ -123,7 +127,8 @@ export default function Dashboard({ dateRange }) {
         category: selectedCategory,
         amount: rawAmount,
         sale_date: addDate,
-        sub_category: addSubCategory
+        sub_category: addSubCategory,
+        branch: selectedBranch
       });
       fetchBreakdown(selectedCategory);
       fetchSummary();
@@ -153,7 +158,8 @@ export default function Dashboard({ dateRange }) {
     try {
       const params = {
         startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
-        endDate: format(dateRange.endDate, 'yyyy-MM-dd')
+        endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
+        branch: selectedBranch
       };
       const res = await axios.get(`${API_URL}/dashboard/report-data`, { params });
       const { sales, purchases, expenses } = res.data;
@@ -163,16 +169,19 @@ export default function Dashboard({ dateRange }) {
 
       sheet.columns = [
         { header: 'Category', key: 'category', width: 45 },
-        { header: 'Amount', key: 'amount', width: 25 }
+        { header: 'Amount', key: 'amount', width: 25 },
+        { header: '% of Total Sales', key: 'percentage', width: 20 }
       ];
       
       sheet.spliceRows(1, 1); // remove default header row
 
+      const cleanBranchName = selectedBranch ? selectedBranch.replace(/\s*\(.*?\)\s*/g, '').trim() : '';
+      
       // Main Title
-      const titleText = `PROFIT AND LOSS ACCOUNT STATEMENT FOR THE PERIOD ${format(dateRange.startDate, 'MMM dd, yyyy').toUpperCase()} TO ${format(dateRange.endDate, 'MMM dd, yyyy').toUpperCase()}`;
+      const titleText = `${cleanBranchName.toUpperCase()}, PROFIT AND LOSS ACCOUNT STATEMENT FOR THE PERIOD ${format(dateRange.startDate, 'MMM dd, yyyy').toUpperCase()} TO ${format(dateRange.endDate, 'MMM dd, yyyy').toUpperCase()}`;
       const titleRow = sheet.addRow([titleText]);
       titleRow.font = { bold: true, size: 12 };
-      sheet.mergeCells('A1:B1');
+      sheet.mergeCells('A1:C1');
       sheet.addRow([]);
 
       const addHeadingRow = (text) => {
@@ -181,9 +190,15 @@ export default function Dashboard({ dateRange }) {
         return row;
       };
 
-      const addDataRow = (category, amount) => {
-        const row = sheet.addRow([category.toUpperCase(), amount]);
+      const addDataRow = (category, amount, percentage = null) => {
+        const rowData = [category.toUpperCase(), amount];
+        if (percentage !== null) rowData.push(percentage);
+        
+        const row = sheet.addRow(rowData);
         row.getCell(2).numFmt = '₹#,##0.00';
+        if (percentage !== null) {
+          row.getCell(3).numFmt = '0.00%'; // Excel automatically multiplies by 100
+        }
         return row;
       };
 
@@ -213,9 +228,9 @@ export default function Dashboard({ dateRange }) {
       });
       const totalSales = salesMap['Tea Counter'] + salesMap['Restaurant'] + salesMap['Online'];
       
-      addDataRow('TEA', salesMap['Tea Counter']);
-      addDataRow('RESTAURANT', salesMap['Restaurant']);
-      addDataRow('ONLINE', salesMap['Online']);
+      addDataRow('TEA', salesMap['Tea Counter'], totalSales > 0 ? salesMap['Tea Counter'] / totalSales : 0);
+      addDataRow('RESTAURANT', salesMap['Restaurant'], totalSales > 0 ? salesMap['Restaurant'] / totalSales : 0);
+      addDataRow('ONLINE', salesMap['Online'], totalSales > 0 ? salesMap['Online'] / totalSales : 0);
       addTotalRow('TOTAL SALE', totalSales);
       sheet.addRow([]);
 
@@ -223,9 +238,11 @@ export default function Dashboard({ dateRange }) {
       addHeadingRow('Purchases');
       let totalPurchases = 0;
       purchases.forEach(p => {
+        totalPurchases += Number(p.total) || 0;
+      });
+      purchases.forEach(p => {
         const amt = Number(p.total) || 0;
-        addDataRow(p.category, amt);
-        totalPurchases += amt;
+        addDataRow(p.category, amt, totalPurchases > 0 ? amt / totalPurchases : 0);
       });
       addTotalRow('TOTAL PURCHASES', totalPurchases);
       sheet.addRow([]);
@@ -241,9 +258,11 @@ export default function Dashboard({ dateRange }) {
       addHeadingRow('Expenses');
       let totalExpenses = 0;
       expenses.forEach(e => {
+        totalExpenses += Number(e.total) || 0;
+      });
+      expenses.forEach(e => {
         const amt = Number(e.total) || 0;
-        addDataRow(e.category, amt);
-        totalExpenses += amt;
+        addDataRow(e.category, amt, totalExpenses > 0 ? amt / totalExpenses : 0);
       });
       addTotalRow('TOTAL EXPENSES', totalExpenses);
       sheet.addRow([]);
@@ -256,7 +275,7 @@ export default function Dashboard({ dateRange }) {
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, `P&L Sheet ${format(dateRange.startDate, 'MMM dd, yyyy')} to ${format(dateRange.endDate, 'MMM dd, yyyy')}.xlsx`);
+      saveAs(blob, `${cleanBranchName}, P&L Sheet ${format(dateRange.startDate, 'MMM dd, yyyy')} to ${format(dateRange.endDate, 'MMM dd, yyyy')}.xlsx`);
       showToast('Report generated successfully');
     } catch (error) {
       console.error('Download failed', error);
@@ -319,7 +338,7 @@ export default function Dashboard({ dateRange }) {
         return showToast('No valid data found under the headers.', 'error');
       }
 
-      await axios.post(`${API_URL}/sales/bulk`, items);
+      await axios.post(`${API_URL}/sales/bulk`, { items, branch: selectedBranch });
       setShowBulkModal(false);
       setBulkFile(null);
       fetchSummary();

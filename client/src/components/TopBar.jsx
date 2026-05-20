@@ -1,7 +1,15 @@
 import { format, startOfMonth, subDays, subMonths, startOfYear } from 'date-fns';
 import { Calendar } from 'lucide-react';
 
-export default function TopBar({ dateRange, setDateRange, activeFilter, setActiveFilter }) {
+export default function TopBar({ dateRange, setDateRange, activeFilter, setActiveFilter, selectedBranch, setSelectedBranch }) {
+  const branches = [
+    'Golden Handi (G.H)',
+    'FNF',
+    'KSK',
+    'Rainier',
+    'Gandharva',
+    'AVA Cloud Kitchen'
+  ];
   const handleDateChange = (type, value) => {
     setDateRange(prev => ({
       ...prev,
@@ -34,10 +42,33 @@ export default function TopBar({ dateRange, setDateRange, activeFilter, setActiv
 
   return (
     <header className="h-16 flex items-center justify-between px-6 bg-dark-bg border-b border-dark-border shrink-0 z-10">
-      <div className="flex items-center gap-4">
-        <h2 className="text-xl font-bold text-white tracking-wide">
+      <div className="flex items-center gap-6">
+        <h2 className="text-xl font-bold text-white tracking-wide hidden xl:block">
           Financial Overview
         </h2>
+
+        {/* Glowing Branch Selector */}
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-brand-primary to-brand-accent rounded-lg blur opacity-40 group-hover:opacity-75 transition duration-500"></div>
+          <div className="relative flex items-center bg-dark-card rounded-lg border border-dark-border overflow-hidden">
+            <select
+              value={selectedBranch || 'Golden Handi (G.H)'}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="appearance-none bg-transparent text-white font-bold tracking-wide px-5 py-2 pr-10 focus:outline-none cursor-pointer text-sm"
+            >
+              {branches.map(branch => (
+                <option key={branch} value={branch} className="bg-dark-bg text-white font-medium py-2">
+                  {branch}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-3 pointer-events-none text-brand-accent">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
