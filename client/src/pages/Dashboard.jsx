@@ -6,7 +6,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { Download, CheckCircle, XCircle, Upload } from 'lucide-react';
 
-const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5001/api';
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : '/api';
 
 export default function Dashboard({ dateRange, selectedBranch }) {
   const [summary, setSummary] = useState({

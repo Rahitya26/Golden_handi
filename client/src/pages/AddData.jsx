@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { Upload, CheckCircle, XCircle, Plus, Edit2, Trash2 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
-const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5001/api';
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5001/api' : '/api';
 
 export default function AddData({ dateRange, selectedBranch }) {
   const [sales, setSales] = useState([]);
